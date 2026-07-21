@@ -1,0 +1,9 @@
+<idea-plugin>
+    <depends>com.intellij.modules.platform</depends>
+    <depends>org.intellij.plugins.markdown</depends>
+
+    <extensions defaultExtensionNs="org.intellij.markdown">
+        <browserPreviewExtensionProvider
+                implementation="cn.fj.loli.markdowntodolist.MarkdownTaskListExtensionProvider"/>
+    </extensions>
+</idea-plugin>
