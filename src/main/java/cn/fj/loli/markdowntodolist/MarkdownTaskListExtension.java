@@ -1,5 +1,8 @@
 package cn.fj.loli.markdowntodolist;
 
+import com.intellij.ide.DataManager;
+import com.intellij.openapi.actionSystem.CommonDataKeys;
+import com.intellij.openapi.actionSystem.DataContext;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.diagnostic.Logger;
@@ -7,37 +10,36 @@ import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.ui.jcef.JBCefBrowserBase;
+import com.intellij.ui.jcef.JBCefJSQuery;
+import com.intellij.ui.jcef.JCEFHtmlPanel;
 import org.intellij.plugins.markdown.extensions.MarkdownBrowserPreviewExtension;
-import org.intellij.plugins.markdown.ui.preview.BrowserPipe;
 import org.intellij.plugins.markdown.ui.preview.MarkdownHtmlPanel;
 import org.intellij.plugins.markdown.ui.preview.ResourceProvider;
 
+import javax.swing.JComponent;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.List;
 
 final class MarkdownTaskListExtension implements MarkdownBrowserPreviewExtension, ResourceProvider {
     private static final Logger LOG = Logger.getInstance(MarkdownTaskListExtension.class);
-    private static final String EVENT_NAME = "markdownTaskListToggle";
     private static final String SCRIPT_NAME = "markdownTaskList/markdown-task-list.js";
 
-    private final MarkdownHtmlPanel panel;
-    private final BrowserPipe browserPipe;
-    private final BrowserPipe.Handler handler;
+    private final JComponent component;
+    private final JBCefJSQuery messageQuery;
 
     MarkdownTaskListExtension(MarkdownHtmlPanel panel) {
-        this.panel = panel;
-        this.browserPipe = panel.getBrowserPipe();
-        this.handler = new BrowserPipe.Handler() {
-            public void messageReceived(String data) {
+        this.component = panel.getComponent();
+        if (panel instanceof JCEFHtmlPanel jcefPanel) {
+            messageQuery = JBCefJSQuery.create((JBCefBrowserBase) jcefPanel);
+            messageQuery.addHandler(data -> {
                 processMessage(data);
-            }
-
-            public boolean processMessageReceived(String data) {
-                return processMessage(data);
-            }
-        };
-        if (browserPipe != null) {
-            browserPipe.subscribe(EVENT_NAME, handler);
+                return null;
+            });
+        }
+        else {
+            messageQuery = null;
         }
     }
 
@@ -48,7 +50,7 @@ final class MarkdownTaskListExtension implements MarkdownBrowserPreviewExtension
 
     @Override
     public List<String> getScripts() {
-        return Collections.singletonList(SCRIPT_NAME);
+        return messageQuery == null ? Collections.emptyList() : Collections.singletonList(SCRIPT_NAME);
     }
 
     @Override
@@ -73,14 +75,27 @@ final class MarkdownTaskListExtension implements MarkdownBrowserPreviewExtension
 
     @Override
     public Resource loadResource(String resourceName) {
-        if (!canProvide(resourceName)) {
+        if (!canProvide(resourceName) || messageQuery == null) {
             return null;
         }
-        return ResourceProvider.loadInternalResource(
+        Resource script = ResourceProvider.loadInternalResource(
                 MarkdownTaskListExtension.class,
                 resourceName,
                 "text/javascript"
         );
+        if (script == null) {
+            return null;
+        }
+
+        String bridge = "window.__markdownTaskListPost = function(data) {"
+                + messageQuery.inject("data")
+                + ";};\n";
+        byte[] bridgeBytes = bridge.getBytes(StandardCharsets.UTF_8);
+        byte[] scriptBytes = script.getContent();
+        byte[] content = new byte[bridgeBytes.length + scriptBytes.length];
+        System.arraycopy(bridgeBytes, 0, content, 0, bridgeBytes.length);
+        System.arraycopy(scriptBytes, 0, content, bridgeBytes.length, scriptBytes.length);
+        return new Resource(content, script.getType());
     }
 
     private boolean processMessage(String data) {
@@ -90,13 +105,14 @@ final class MarkdownTaskListExtension implements MarkdownBrowserPreviewExtension
             return false;
         }
 
-        Project project = panel.getProject();
-        VirtualFile file = panel.getVirtualFile();
-        if (project == null || file == null) {
-            return false;
-        }
-
-        ApplicationManager.getApplication().invokeLater(() -> applyToggle(project, file, request));
+        ApplicationManager.getApplication().invokeLater(() -> {
+            DataContext dataContext = DataManager.getInstance().getDataContext(component);
+            Project project = CommonDataKeys.PROJECT.getData(dataContext);
+            VirtualFile file = CommonDataKeys.VIRTUAL_FILE.getData(dataContext);
+            if (project != null && file != null) {
+                applyToggle(project, file, request);
+            }
+        });
         return false;
     }
 
@@ -136,8 +152,8 @@ final class MarkdownTaskListExtension implements MarkdownBrowserPreviewExtension
 
     @Override
     public void dispose() {
-        if (browserPipe != null) {
-            browserPipe.removeSubscription(EVENT_NAME, handler);
+        if (messageQuery != null) {
+            messageQuery.dispose();
         }
     }
 
