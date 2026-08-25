@@ -6,7 +6,6 @@
   }
   window.__markdownTaskListSupportInstalled = true;
 
-  const eventName = "markdownTaskListToggle";
   const checkboxSelector = ".task-list-item input[type=\"checkbox\"]";
 
   function enableTaskCheckboxes(root) {
@@ -66,7 +65,7 @@
     const data = from + "|" + to + "|" + (checkbox.checked ? "1" : "0") + "|" + index;
 
     try {
-      window.__IntelliJTools.messagePipe.post(eventName, data);
+      window.__markdownTaskListPost(data);
     }
     catch (error) {
       console.error("Failed to update Markdown task checkbox", error);
