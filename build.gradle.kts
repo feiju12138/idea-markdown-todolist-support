@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "cn.fj.loli"
-version = "1.0.0"
+version = "1.0.1"
 
 dependencies {
     intellijPlatform {
@@ -32,6 +32,7 @@ intellijPlatform {
         """.trimIndent()
         changeNotes = """
             <ul>
+                <li>1.0.1: Replace experimental Markdown preview APIs with stable platform APIs.</li>
                 <li>1.0.0: Add clickable Markdown task-list checkboxes in the built-in JCEF preview, with source-position mapping and undo/redo support.</li>
             </ul>
         """.trimIndent()
