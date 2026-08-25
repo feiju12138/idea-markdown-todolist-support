@@ -15,7 +15,7 @@ The change goes through IntelliJ IDEA's document and command systems, so the sou
 - The bundled Markdown plugin must be enabled
 - The interactive behavior applies to the built-in JCEF Markdown preview
 
-The preview API used by the plugin was checked against IDEA 2022.3, 2023.3, 2024.1, and 2026.1.3. The release uses Java 17 bytecode and has no `until-build`.
+The preview integration was checked against IDEA 2022.3, 2023.3, 2024.1, and 2026.1. The release uses stable platform APIs, Java 17 bytecode, and has no `until-build`.
 
 ## Build
 
